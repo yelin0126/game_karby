@@ -14,19 +14,17 @@
   <main class="app-shell">
     <section class="hero-copy">
       <div class="brand-pill">GAME KARBY</div>
-      <h1>수달 기사 카비와<br>조개 러닝 어드벤처</h1>
+      <h1>수달 기사 카비와<br>대화형 러닝 어드벤처</h1>
       <p>
-        게임 시작 전에 이름을 입력하고, 바위를 피하면서 조개를 모아보세요.
-        방문 기록과 랭킹은 현재 브라우저에 저장됩니다.
+        왼쪽에서는 귀여운 수달이 달리고, 오른쪽에서는 친구와 채팅하듯 작전을 주고받는
+        GitHub Pages용 정적 웹게임입니다.
       </p>
       <div class="hero-actions">
         <button id="start-run-btn" class="primary-btn" type="button">게임 시작</button>
         <button id="show-tip-btn" class="ghost-btn" type="button">조작법 보기</button>
       </div>
       <div class="hero-tip" id="hero-tip">
-        <strong>조작법</strong><br>
-        PC: `Space` 점프, `↓` 숙이기, `Esc` 일시정지<br>
-        모바일: 화면 탭 또는 점프 버튼으로 점프, 숙이기 버튼으로 갈매기 피하기
+        Spacebar나 화면 클릭으로 점프하고, 조개를 먹으면 코인이 올라가요.
       </div>
     </section>
 
@@ -35,29 +33,22 @@
         <div class="panel-head">
           <div>
             <span class="panel-label">OTTER RUNNER</span>
-            <h2>Shell Dash</h2>
+            <h2>Forest Dash</h2>
           </div>
-          <div class="score-cluster">
-            <div class="score-box">
-              <span>플레이어</span>
-              <strong id="player-value">Guest</strong>
-            </div>
-            <div class="score-box">
-              <span>거리</span>
-              <strong id="distance-value">000m</strong>
-            </div>
-            <div class="score-box coin-box">
-              <span>조개 코인</span>
-              <strong id="coin-value">00</strong>
-            </div>
-            <div class="score-box">
-              <span>최고 기록</span>
-              <strong id="best-value">000m</strong>
-            </div>
+        <div class="score-cluster">
+          <div class="score-box">
+            <span>거리</span>
+            <strong id="distance-value">000m</strong>
+          </div>
+          <div class="score-box coin-box">
+            <span>조개 코인</span>
+            <strong id="coin-value">00</strong>
+          </div>
+          <div class="score-box">
+            <span>최고 기록</span>
+            <strong id="best-value">000m</strong>
           </div>
         </div>
-        <div class="stage-actions">
-          <button id="pause-btn" class="ghost-btn stage-btn" type="button">일시정지</button>
         </div>
 
         <div class="game-stage-wrap">
@@ -65,11 +56,8 @@
           <div class="game-overlay" id="game-overlay">
             <div class="overlay-card">
               <div class="overlay-badge">READY</div>
-              <h3>카비와 함께 출발할 이름을 적어주세요</h3>
-              <p>이름을 입력하면 방문자 채팅에 글을 남길 수 있고, 게임 종료 후 점수 랭킹에도 반영됩니다.</p>
-              <label class="overlay-input-label" for="player-name-input">사용자 이름</label>
-              <input id="player-name-input" class="overlay-input" type="text" maxlength="18" placeholder="예: yelin">
-              <div class="overlay-helper" id="overlay-helper">이 브라우저 기준으로 기록이 저장돼요.</div>
+              <h3>카비가 출발 준비 중!</h3>
+              <p>숲길 장애물을 피해 멀리 달려보세요. 채팅창에서 친구가 힌트도 보내줍니다.</p>
               <button id="overlay-start-btn" class="primary-btn" type="button">출발하기</button>
             </div>
           </div>
@@ -77,53 +65,54 @@
 
         <div class="game-footer">
           <div class="control-chip">SPACE / 클릭 : 점프</div>
-          <div class="control-chip">↓ : 숙이기</div>
           <div class="control-chip warm">ESC : 일시정지</div>
-        </div>
-
-        <div class="mobile-controls">
-          <button id="jump-btn" class="mobile-btn" type="button">점프</button>
-          <button id="duck-btn" class="mobile-btn soft" type="button">숙이기</button>
         </div>
       </article>
 
-      <aside class="side-card">
-        <div class="side-head">
-          <div class="side-head-copy">
-            <span class="panel-label">VISITOR CHAT</span>
-            <h2>방문자 채팅</h2>
-            <p>방문자가 이름으로 한마디를 남길 수 있는 보드예요.</p>
+      <aside class="chat-card">
+        <div class="chat-head">
+          <div class="chat-user-block">
+            <div class="otter-avatar">
+              <div class="otter-ears"></div>
+              <div class="otter-face">
+                <span class="eye left"></span>
+                <span class="eye right"></span>
+                <span class="nose"></span>
+              </div>
+            </div>
+            <div>
+              <span class="panel-label">TERMINAL CHAT</span>
+              <h2>틸바니안 통신기</h2>
+            </div>
+          </div>
+          <span class="status-dot">online</span>
+        </div>
+
+        <div class="chat-window" id="chat-window">
+          <div class="chat-line friend">
+            <span class="chat-name">루나</span>
+            <p>카비, 숲 입구 도착했어? 오늘은 도토리 폭탄이 많이 떨어진대.</p>
+          </div>
+          <div class="chat-line me">
+            <span class="chat-name">카비</span>
+            <p>도착 완료. 방패 챙겼고 지금부터 전력질주 간다.</p>
+          </div>
+          <div class="chat-line system">
+            <span class="chat-name">system</span>
+            <p>친구 채팅은 로컬 시뮬레이션입니다. GitHub Pages에서 바로 동작해요.</p>
           </div>
         </div>
 
-        <div class="side-note">
-          앞으로 더 재미있는 게임을 만들겠습니당
+        <div class="quick-replies">
+          <button class="reply-btn" type="button" data-reply="점프 타이밍 알려줘!">점프 타이밍 알려줘!</button>
+          <button class="reply-btn" type="button" data-reply="숲길 분위기 어때?">숲길 분위기 어때?</button>
+          <button class="reply-btn" type="button" data-reply="도토리 간식 챙겨줘">도토리 간식 챙겨줘</button>
         </div>
 
-        <div class="board-grid">
-          <section class="board-panel">
-            <div class="board-title-row">
-              <span class="panel-label">MESSAGES</span>
-              <strong id="guestbook-count">0개</strong>
-            </div>
-            <form id="guestbook-form" class="guestbook-form">
-              <input id="guestbook-input" type="text" maxlength="120" placeholder="방문자 한마디 남기기...">
-              <button class="primary-btn" type="submit">남기기</button>
-            </form>
-            <div class="guestbook-mascot">
-              <img src="assets/guestbook-buddy.svg" alt="방명록 마스코트">
-            </div>
-            <ul id="guestbook-list" class="board-list"></ul>
-          </section>
-
-          <section class="board-panel">
-            <div class="board-title-row">
-              <span class="panel-label">LEADERBOARD</span>
-              <strong>TOP 5</strong>
-            </div>
-            <ol id="leaderboard-list" class="leaderboard-list"></ol>
-          </section>
-        </div>
+        <form class="chat-form" id="chat-form">
+          <input id="chat-input" type="text" maxlength="120" placeholder="친구에게 메시지 보내기...">
+          <button class="primary-btn small" type="submit">전송</button>
+        </form>
       </aside>
     </section>
   </main>
