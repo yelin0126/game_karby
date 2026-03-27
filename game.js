@@ -309,15 +309,106 @@ function drawRoundedRect(x, y, width, height, radius, fill) {
   ctx.fill();
 }
 
+function lerp(start, end, amount) {
+  return start + (end - start) * amount;
+}
+
+function mixColor(from, to, amount) {
+  const normalize = color => color.replace('#', '');
+  const fromHex = normalize(from);
+  const toHex = normalize(to);
+  const fromR = Number.parseInt(fromHex.slice(0, 2), 16);
+  const fromG = Number.parseInt(fromHex.slice(2, 4), 16);
+  const fromB = Number.parseInt(fromHex.slice(4, 6), 16);
+  const toR = Number.parseInt(toHex.slice(0, 2), 16);
+  const toG = Number.parseInt(toHex.slice(2, 4), 16);
+  const toB = Number.parseInt(toHex.slice(4, 6), 16);
+  const r = Math.round(lerp(fromR, toR, amount));
+  const g = Math.round(lerp(fromG, toG, amount));
+  const b = Math.round(lerp(fromB, toB, amount));
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+function getTimePalette() {
+  const morning = {
+    skyTop: '#bfe8fa',
+    skyMid: '#dff3dc',
+    skyBottom: '#d6a775',
+    cloud: 'rgba(255,255,255,0.72)',
+    hill: '#a7cf85',
+    grass: '#5f9e5f',
+    dirt: '#6b4327',
+    spark: '#f7ce65',
+    sun: '#ffd46b',
+  };
+  const noon = {
+    skyTop: '#8fd8ff',
+    skyMid: '#b9f0ff',
+    skyBottom: '#c7e59a',
+    cloud: 'rgba(255,255,255,0.88)',
+    hill: '#8fc56f',
+    grass: '#4b9551',
+    dirt: '#6a4129',
+    spark: '#fff0a4',
+    sun: '#fff1a8',
+  };
+  const evening = {
+    skyTop: '#5e6ccf',
+    skyMid: '#f29b6d',
+    skyBottom: '#6f4a68',
+    cloud: 'rgba(255,230,217,0.78)',
+    hill: '#6e8d63',
+    grass: '#456b4b',
+    dirt: '#513321',
+    spark: '#ffc86a',
+    sun: '#ffb55d',
+  };
+
+  const distance = state.distance;
+  if (distance < 260) {
+    const amount = Math.min(1, distance / 260);
+    return {
+      skyTop: mixColor(morning.skyTop, noon.skyTop, amount),
+      skyMid: mixColor(morning.skyMid, noon.skyMid, amount),
+      skyBottom: mixColor(morning.skyBottom, noon.skyBottom, amount),
+      cloud: amount < 0.5 ? morning.cloud : noon.cloud,
+      hill: mixColor(morning.hill, noon.hill, amount),
+      grass: mixColor(morning.grass, noon.grass, amount),
+      dirt: mixColor(morning.dirt, noon.dirt, amount),
+      spark: mixColor(morning.spark, noon.spark, amount),
+      sun: mixColor(morning.sun, noon.sun, amount),
+    };
+  }
+
+  const amount = Math.min(1, (distance - 260) / 320);
+  return {
+    skyTop: mixColor(noon.skyTop, evening.skyTop, amount),
+    skyMid: mixColor(noon.skyMid, evening.skyMid, amount),
+    skyBottom: mixColor(noon.skyBottom, evening.skyBottom, amount),
+    cloud: amount < 0.5 ? noon.cloud : evening.cloud,
+    hill: mixColor(noon.hill, evening.hill, amount),
+    grass: mixColor(noon.grass, evening.grass, amount),
+    dirt: mixColor(noon.dirt, evening.dirt, amount),
+    spark: mixColor(noon.spark, evening.spark, amount),
+    sun: mixColor(noon.sun, evening.sun, amount),
+  };
+}
+
 function drawBackground() {
+  const palette = getTimePalette();
   const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  gradient.addColorStop(0, '#bfe8fa');
-  gradient.addColorStop(0.55, '#dff3dc');
-  gradient.addColorStop(1, '#d6a775');
+  gradient.addColorStop(0, palette.skyTop);
+  gradient.addColorStop(0.55, palette.skyMid);
+  gradient.addColorStop(1, palette.skyBottom);
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  ctx.fillStyle = palette.sun;
+  ctx.beginPath();
+  ctx.arc(canvas.width - 110, 86, 34, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = palette.cloud;
   for (let i = 0; i < 5; i += 1) {
     const x = ((i * 220) - cloudOffset) % (canvas.width + 200) - 100;
     const y = 40 + (i % 2) * 28;
@@ -328,7 +419,7 @@ function drawBackground() {
     ctx.fill();
   }
 
-  ctx.fillStyle = '#a7cf85';
+  ctx.fillStyle = palette.hill;
   for (let i = 0; i < 4; i += 1) {
     const x = ((i * 320) - hillOffset) % (canvas.width + 380) - 180;
     ctx.beginPath();
@@ -336,12 +427,12 @@ function drawBackground() {
     ctx.fill();
   }
 
-  ctx.fillStyle = '#5f9e5f';
+  ctx.fillStyle = palette.grass;
   ctx.fillRect(0, groundY + 34, canvas.width, 70);
-  ctx.fillStyle = '#6b4327';
+  ctx.fillStyle = palette.dirt;
   ctx.fillRect(0, groundY + 82, canvas.width, canvas.height - groundY);
 
-  ctx.fillStyle = '#f7ce65';
+  ctx.fillStyle = palette.spark;
   for (let i = 0; i < 16; i += 1) {
     const x = ((i * 78) - sparkOffset) % (canvas.width + 40) - 20;
     ctx.beginPath();
