@@ -63,7 +63,7 @@ const player = {
   width: 104,
   height: 116,
   velocityY: 0,
-  jumpPower: -15.8,
+  jumpPower: -16.6,
   grounded: true,
   bob: 0,
 };
@@ -257,7 +257,7 @@ function startGameFromInput() {
 function resetGame() {
   state.distance = 0;
   state.coins = 0;
-  state.speed = 5.6;
+  state.speed = 4.15;
   state.playing = true;
   state.paused = false;
   obstacles.length = 0;
@@ -302,35 +302,36 @@ function emitDust(x, y, count, color) {
 
 function maybeSpawnObstacle(delta) {
   spawnTimer += delta;
-  const threshold = Math.max(720, 1480 - state.distance * 0.85);
+  const threshold = Math.max(1120, 2200 - state.distance * 1.05);
   if (spawnTimer < threshold) return;
   spawnTimer = 0;
 
-  const large = Math.random() > 0.48;
+  const largeChance = Math.min(0.62, 0.12 + state.distance / 1800);
+  const large = Math.random() < largeChance;
   obstacles.push({
     x: canvas.width + 80,
-    width: large ? 84 : 62,
-    height: large ? 78 : 54,
+    width: large ? 80 : 54,
+    height: large ? 72 : 48,
     type: large ? 'boulder' : 'rock',
   });
 }
 
 function maybeSpawnCollectible(delta) {
   collectibleTimer += delta;
-  const threshold = Math.max(580, 1080 - state.distance * 0.5);
+  const threshold = Math.max(520, 980 - state.distance * 0.35);
   if (collectibleTimer < threshold) return;
   collectibleTimer = 0;
 
   collectibles.push({
     x: canvas.width + 40,
-    y: groundY - 78 - Math.random() * 88,
+    y: groundY - 68 - Math.random() * 62,
     width: 36,
     height: 30,
     bob: Math.random() * Math.PI * 2,
   });
 }
 
-function intersects(a, b, padding = 12) {
+function intersects(a, b, padding = 16) {
   const ax = a.x + 14;
   const ay = a.y + 16;
   const aw = a.width - 30;
@@ -363,7 +364,7 @@ function update(delta) {
   if (!state.playing || state.paused) return;
 
   state.distance += state.speed * delta * 0.024;
-  state.speed += delta * 0.0009;
+  state.speed += delta * 0.00032;
   cloudOffset += state.speed * delta * 0.01;
   hillOffset += state.speed * delta * 0.018;
   sparkOffset += state.speed * delta * 0.03;
@@ -438,44 +439,73 @@ function drawRoundedRect(x, y, width, height, radius, fill) {
   ctx.fill();
 }
 
+function drawPixelPattern(originX, originY, blockSize, pattern, color) {
+  ctx.fillStyle = color;
+  pattern.forEach((row, rowIndex) => {
+    row.forEach((cell, cellIndex) => {
+      if (!cell) return;
+      ctx.fillRect(
+        Math.round((originX + cellIndex * blockSize) / 2) * 2,
+        Math.round((originY + rowIndex * blockSize) / 2) * 2,
+        blockSize,
+        blockSize,
+      );
+    });
+  });
+}
+
 function drawBackground() {
-  const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  gradient.addColorStop(0, '#bfe8fa');
-  gradient.addColorStop(0.55, '#dff3dc');
-  gradient.addColorStop(1, '#d6a775');
-  ctx.fillStyle = gradient;
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = '#bfe8fa';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  ctx.fillStyle = 'rgba(255,255,255,0.72)';
+  ctx.fillStyle = '#d8f1ff';
+  ctx.fillRect(0, 0, canvas.width, 84);
+
+  const cloudPattern = [
+    [0, 1, 1, 1, 0, 1, 1, 0],
+    [1, 1, 1, 1, 1, 1, 1, 1],
+    [0, 1, 1, 1, 1, 1, 1, 0],
+  ];
   for (let index = 0; index < 5; index += 1) {
-    const x = ((index * 220) - cloudOffset) % (canvas.width + 200) - 100;
-    const y = 40 + (index % 2) * 28;
-    ctx.beginPath();
-    ctx.arc(x, y, 24, 0, Math.PI * 2);
-    ctx.arc(x + 24, y + 8, 20, 0, Math.PI * 2);
-    ctx.arc(x - 26, y + 10, 18, 0, Math.PI * 2);
-    ctx.fill();
+    const x = ((index * 220) - cloudOffset) % (canvas.width + 220) - 110;
+    const y = 38 + (index % 2) * 26;
+    drawPixelPattern(x, y, 12, cloudPattern, '#ffffff');
   }
 
-  ctx.fillStyle = '#a7cf85';
+  const hillPattern = [
+    [0, 0, 0, 1, 1, 0, 0, 0],
+    [0, 0, 1, 1, 1, 1, 0, 0],
+    [0, 1, 1, 1, 1, 1, 1, 0],
+    [1, 1, 1, 1, 1, 1, 1, 1],
+  ];
   for (let index = 0; index < 4; index += 1) {
-    const x = ((index * 320) - hillOffset) % (canvas.width + 380) - 180;
-    ctx.beginPath();
-    ctx.arc(x, groundY + 72, 150, Math.PI, 0);
-    ctx.fill();
+    const x = ((index * 250) - hillOffset) % (canvas.width + 250) - 140;
+    drawPixelPattern(x, groundY - 90, 28, hillPattern, '#9fc783');
+    drawPixelPattern(x + 20, groundY - 42, hillPattern, 22, '#86b86e');
   }
 
-  ctx.fillStyle = '#5f9e5f';
-  ctx.fillRect(0, groundY + 34, canvas.width, 70);
+  for (let index = 0; index < 7; index += 1) {
+    const x = ((index * 148) - hillOffset * 1.3) % (canvas.width + 120) - 60;
+    ctx.fillStyle = '#4d874e';
+    ctx.fillRect(x, groundY - 34, 18, 68);
+    drawPixelPattern(x - 18, groundY - 82, 18, [[0,1,0],[1,1,1],[1,1,1]], '#2f6a3f');
+  }
+
+  ctx.fillStyle = '#68a55c';
+  ctx.fillRect(0, groundY + 26, canvas.width, 74);
+  ctx.fillStyle = '#7fc06b';
+  for (let index = 0; index < canvas.width; index += 24) {
+    ctx.fillRect(index, groundY + 18 + (index % 48 === 0 ? 0 : 8), 12, 18);
+  }
+
   ctx.fillStyle = '#6b4327';
   ctx.fillRect(0, groundY + 82, canvas.width, canvas.height - groundY);
 
   ctx.fillStyle = '#f7ce65';
   for (let index = 0; index < 16; index += 1) {
     const x = ((index * 78) - sparkOffset) % (canvas.width + 40) - 20;
-    ctx.beginPath();
-    ctx.arc(x, groundY + 18 + (index % 3) * 5, 3, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillRect(x, groundY + 12 + (index % 3) * 6, 6, 6);
   }
 }
 
