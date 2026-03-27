@@ -26,8 +26,8 @@ let state = {
   paused: false,
   distance: 0,
   best: bestDistance,
-  speed: 5.5,
-  gravity: 0.75,
+  speed: 4.2,
+  gravity: 0.68,
   lastTime: 0,
 };
 
@@ -52,7 +52,7 @@ let sparkOffset = 0;
 
 function resetGame() {
   state.distance = 0;
-  state.speed = 5.5;
+  state.speed = 4.2;
   state.playing = true;
   state.paused = false;
   obstacles.length = 0;
@@ -94,15 +94,15 @@ function emitDust(x, y, count, color) {
 
 function maybeSpawnObstacle(delta) {
   spawnTimer += delta;
-  const threshold = Math.max(700, 1480 - state.distance * 0.8);
+  const threshold = Math.max(1100, 2150 - state.distance * 0.55);
   if (spawnTimer < threshold) return;
   spawnTimer = 0;
 
-  const tall = Math.random() > 0.55;
+  const tall = Math.random() > 0.68;
   obstacles.push({
     x: canvas.width + 60,
-    width: tall ? 34 : 52,
-    height: tall ? 86 : 54,
+    width: tall ? 32 : 48,
+    height: tall ? 72 : 48,
     type: tall ? 'crystal' : 'log',
   });
 }
@@ -111,7 +111,7 @@ function update(delta) {
   if (!state.playing || state.paused) return;
 
   state.distance += state.speed * delta * 0.024;
-  state.speed += delta * 0.0009;
+  state.speed += delta * 0.00035;
   cloudOffset += state.speed * delta * 0.01;
   hillOffset += state.speed * delta * 0.018;
   sparkOffset += state.speed * delta * 0.03;
@@ -463,4 +463,5 @@ canvas.addEventListener('pointerdown', () => {
 
 renderHud();
 player.y = groundY - player.height;
+chatWindow.innerHTML = '<div class="chat-line system"><span class="chat-name">system</span><p>아직 남겨진 글이 없어요.</p></div>';
 requestAnimationFrame(loop);
