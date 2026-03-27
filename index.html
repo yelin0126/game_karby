@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Karby Otter Run</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="noise"></div>
+  <main class="app-shell">
+    <section class="hero-copy">
+      <div class="brand-pill">GAME KARBY</div>
+      <h1>수달 기사 카비와<br>대화형 러닝 어드벤처</h1>
+      <p>
+        왼쪽에서는 귀여운 수달이 달리고, 오른쪽에서는 친구와 채팅하듯 작전을 주고받는
+        GitHub Pages용 정적 웹게임입니다.
+      </p>
+      <div class="hero-actions">
+        <button id="start-run-btn" class="primary-btn" type="button">게임 시작</button>
+        <button id="show-tip-btn" class="ghost-btn" type="button">조작법 보기</button>
+      </div>
+      <div class="hero-tip" id="hero-tip">
+        Space, W, 위 방향키 또는 화면 클릭으로 점프할 수 있어요.
+      </div>
+    </section>
+
+    <section class="experience-grid">
+      <article class="game-card">
+        <div class="panel-head">
+          <div>
+            <span class="panel-label">OTTER RUNNER</span>
+            <h2>Forest Dash</h2>
+          </div>
+          <div class="score-cluster">
+            <div class="score-box">
+              <span>거리</span>
+              <strong id="distance-value">000m</strong>
+            </div>
+            <div class="score-box">
+              <span>최고 기록</span>
+              <strong id="best-value">000m</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="game-stage-wrap">
+          <canvas id="game-canvas" width="920" height="480" aria-label="수달 러닝 게임"></canvas>
+          <div class="game-overlay" id="game-overlay">
+            <div class="overlay-card">
+              <div class="overlay-badge">READY</div>
+              <h3>카비가 출발 준비 중!</h3>
+              <p>숲길 장애물을 피해 멀리 달려보세요. 채팅창에서 친구가 힌트도 보내줍니다.</p>
+              <button id="overlay-start-btn" class="primary-btn" type="button">출발하기</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="game-footer">
+          <div class="control-chip">SPACE / W / ↑ / 클릭 : 점프</div>
+          <div class="control-chip warm">ESC : 일시정지</div>
+        </div>
+      </article>
+
+      <aside class="chat-card">
+        <div class="chat-head">
+          <div class="chat-user-block">
+            <div class="otter-avatar">
+              <div class="otter-ears"></div>
+              <div class="otter-face">
+                <span class="eye left"></span>
+                <span class="eye right"></span>
+                <span class="nose"></span>
+              </div>
+            </div>
+            <div>
+              <span class="panel-label">TERMINAL CHAT</span>
+              <h2>틸바니안 통신기</h2>
+            </div>
+          </div>
+          <span class="status-dot">online</span>
+        </div>
+
+        <div class="chat-window" id="chat-window">
+          <div class="chat-line friend">
+            <span class="chat-name">루나</span>
+            <p>카비, 숲 입구 도착했어? 오늘은 도토리 폭탄이 많이 떨어진대.</p>
+          </div>
+          <div class="chat-line me">
+            <span class="chat-name">카비</span>
+            <p>도착 완료. 방패 챙겼고 지금부터 전력질주 간다.</p>
+          </div>
+          <div class="chat-line system">
+            <span class="chat-name">system</span>
+            <p>친구 채팅은 로컬 시뮬레이션입니다. GitHub Pages에서 바로 동작해요.</p>
+          </div>
+        </div>
+
+        <div class="quick-replies">
+          <button class="reply-btn" type="button" data-reply="점프 타이밍 알려줘!">점프 타이밍 알려줘!</button>
+          <button class="reply-btn" type="button" data-reply="숲길 분위기 어때?">숲길 분위기 어때?</button>
+          <button class="reply-btn" type="button" data-reply="도토리 간식 챙겨줘">도토리 간식 챙겨줘</button>
+        </div>
+
+        <form class="chat-form" id="chat-form">
+          <input id="chat-input" type="text" maxlength="120" placeholder="친구에게 메시지 보내기...">
+          <button class="primary-btn small" type="submit">전송</button>
+        </form>
+      </aside>
+    </section>
+  </main>
+
+  <script src="game.js"></script>
+</body>
+</html>
