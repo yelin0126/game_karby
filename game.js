@@ -7,7 +7,6 @@ const startRunBtn = document.getElementById('start-run-btn');
 const showTipBtn = document.getElementById('show-tip-btn');
 const heroTip = document.getElementById('hero-tip');
 const distanceValue = document.getElementById('distance-value');
-const coinValue = document.getElementById('coin-value');
 const bestValue = document.getElementById('best-value');
 
 const chatWindow = document.getElementById('chat-window');
@@ -26,7 +25,6 @@ let state = {
   playing: false,
   paused: false,
   distance: 0,
-  coins: 0,
   best: bestDistance,
   speed: 5.5,
   gravity: 0.75,
@@ -46,31 +44,25 @@ const player = {
 
 const groundY = canvas.height - 96;
 const obstacles = [];
-const collectibles = [];
 const particles = [];
 let spawnTimer = 0;
-let collectibleTimer = 0;
 let cloudOffset = 0;
 let hillOffset = 0;
 let sparkOffset = 0;
 
 function resetGame() {
   state.distance = 0;
-  state.coins = 0;
   state.speed = 5.5;
   state.playing = true;
   state.paused = false;
   obstacles.length = 0;
-  collectibles.length = 0;
   particles.length = 0;
   spawnTimer = 0;
-  collectibleTimer = 0;
   player.y = groundY - player.height;
   player.velocityY = 0;
   player.grounded = true;
   overlay.classList.add('hidden');
-  pushSystemMessage('새 러닝 시작! 바위를 피하고 조개를 모아보세요.');
-  renderHud();
+  pushSystemMessage('새 러닝 시작! 카비가 숲길로 출발합니다.');
 }
 
 function togglePause() {
@@ -106,28 +98,12 @@ function maybeSpawnObstacle(delta) {
   if (spawnTimer < threshold) return;
   spawnTimer = 0;
 
-  const tall = Math.random() > 0.45;
+  const tall = Math.random() > 0.55;
   obstacles.push({
     x: canvas.width + 60,
-    width: tall ? 74 : 58,
-    height: tall ? 72 : 50,
-    type: tall ? 'boulder' : 'rock',
-  });
-}
-
-function maybeSpawnCollectible(delta) {
-  collectibleTimer += delta;
-  const threshold = Math.max(600, 1180 - state.distance * 0.5);
-  if (collectibleTimer < threshold) return;
-  collectibleTimer = 0;
-
-  collectibles.push({
-    x: canvas.width + 40,
-    y: groundY - 72 - Math.random() * 92,
-    width: 34,
-    height: 28,
-    bob: Math.random() * Math.PI * 2,
-    collected: false,
+    width: tall ? 34 : 52,
+    height: tall ? 86 : 54,
+    type: tall ? 'crystal' : 'log',
   });
 }
 
@@ -151,23 +127,13 @@ function update(delta) {
   player.bob += delta * 0.012;
 
   maybeSpawnObstacle(delta);
-  maybeSpawnCollectible(delta);
 
   obstacles.forEach(obstacle => {
     obstacle.x -= state.speed * delta * 0.1;
   });
 
-  collectibles.forEach(shell => {
-    shell.x -= state.speed * delta * 0.1;
-    shell.bob += delta * 0.01;
-  });
-
   while (obstacles.length && obstacles[0].x + obstacles[0].width < -30) {
     obstacles.shift();
-  }
-
-  while (collectibles.length && collectibles[0].x + collectibles[0].width < -40) {
-    collectibles.shift();
   }
 
   particles.forEach((particle, index) => {
@@ -185,28 +151,17 @@ function update(delta) {
     }
   }
 
-  for (let index = collectibles.length - 1; index >= 0; index -= 1) {
-    const shell = collectibles[index];
-    if (intersects(player, shell, 6)) {
-      collectibles.splice(index, 1);
-      state.coins += 1;
-      emitDust(shell.x + shell.width / 2, shell.y + shell.height / 2, 10, '#ffe39d');
-      if (state.coins % 5 === 0) {
-        pushFriendMessage(`조개 ${state.coins}개 모았어! 계속 달리면 숨은 길도 찾을 수 있겠는데?`);
-      }
-    }
-  }
-
   renderHud();
 }
 
-function intersects(a, obstacle, padding = 12) {
+function intersects(a, obstacle) {
+  const padding = 12;
   const ax = a.x + 8;
   const ay = a.y + 10;
   const aw = a.width - 16;
   const ah = a.height - 14;
   const bx = obstacle.x + padding;
-  const by = (obstacle.y ?? (groundY - obstacle.height)) + padding / 2;
+  const by = groundY - obstacle.height + padding / 2;
   const bw = obstacle.width - padding * 1.2;
   const bh = obstacle.height - padding;
 
@@ -218,7 +173,7 @@ function endGame() {
   overlay.classList.remove('hidden');
   document.querySelector('.overlay-badge').textContent = 'GAME OVER';
   document.querySelector('.overlay-card h3').textContent = '카비가 잠깐 미끄러졌어요!';
-  document.querySelector('.overlay-card p').textContent = `이번 기록은 ${Math.floor(state.distance)}m, 조개는 ${state.coins}개예요. 다시 도전해서 더 멀리 달려보세요.`;
+  document.querySelector('.overlay-card p').textContent = `이번 기록은 ${Math.floor(state.distance)}m 입니다. 다시 도전해서 더 멀리 달려보세요.`;
   overlayStartBtn.textContent = '다시 달리기';
 
   const finalDistance = Math.floor(state.distance);
@@ -234,7 +189,6 @@ function endGame() {
 
 function renderHud() {
   distanceValue.textContent = `${String(Math.floor(state.distance)).padStart(3, '0')}m`;
-  coinValue.textContent = String(state.coins).padStart(2, '0');
   bestValue.textContent = `${String(Math.floor(state.best)).padStart(3, '0')}m`;
 }
 
@@ -381,66 +335,34 @@ function drawPlayer() {
 function drawObstacle(obstacle) {
   const x = obstacle.x;
   const y = groundY - obstacle.height;
-  ctx.fillStyle = obstacle.type === 'boulder' ? '#766250' : '#6f6053';
-  ctx.beginPath();
-  ctx.moveTo(x + obstacle.width * 0.1, y + obstacle.height * 0.7);
-  ctx.lineTo(x + obstacle.width * 0.24, y + obstacle.height * 0.2);
-  ctx.lineTo(x + obstacle.width * 0.56, y + obstacle.height * 0.04);
-  ctx.lineTo(x + obstacle.width * 0.88, y + obstacle.height * 0.24);
-  ctx.lineTo(x + obstacle.width, y + obstacle.height * 0.62);
-  ctx.lineTo(x + obstacle.width * 0.84, y + obstacle.height);
-  ctx.lineTo(x + obstacle.width * 0.28, y + obstacle.height);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.fillStyle = obstacle.type === 'boulder' ? '#a08a72' : '#99826b';
-  ctx.beginPath();
-  ctx.moveTo(x + obstacle.width * 0.22, y + obstacle.height * 0.62);
-  ctx.lineTo(x + obstacle.width * 0.34, y + obstacle.height * 0.28);
-  ctx.lineTo(x + obstacle.width * 0.58, y + obstacle.height * 0.18);
-  ctx.lineTo(x + obstacle.width * 0.78, y + obstacle.height * 0.34);
-  ctx.lineTo(x + obstacle.width * 0.78, y + obstacle.height * 0.72);
-  ctx.lineTo(x + obstacle.width * 0.6, y + obstacle.height * 0.84);
-  ctx.lineTo(x + obstacle.width * 0.34, y + obstacle.height * 0.82);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.strokeStyle = 'rgba(53, 40, 29, 0.35)';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(x + obstacle.width * 0.38, y + obstacle.height * 0.3);
-  ctx.lineTo(x + obstacle.width * 0.49, y + obstacle.height * 0.68);
-  ctx.lineTo(x + obstacle.width * 0.68, y + obstacle.height * 0.48);
-  ctx.stroke();
-}
-
-function drawCollectible(shell) {
-  const x = shell.x;
-  const y = shell.y + Math.sin(shell.bob) * 6;
-
-  ctx.fillStyle = '#ffe09e';
-  ctx.beginPath();
-  ctx.ellipse(x + shell.width / 2, y + shell.height / 2, 18, 12, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = '#fff3ce';
-  ctx.beginPath();
-  ctx.ellipse(x + shell.width / 2, y + shell.height / 2 + 2, 14, 9, 0, 0, Math.PI, true);
-  ctx.fill();
-
-  ctx.strokeStyle = '#d08a47';
-  ctx.lineWidth = 2;
-  for (let i = 0; i < 4; i += 1) {
+  if (obstacle.type === 'log') {
+    drawRoundedRect(x, y, obstacle.width, obstacle.height, 16, '#6a4228');
+    ctx.fillStyle = '#8c5939';
+    drawRoundedRect(x + 6, y + 8, obstacle.width - 12, obstacle.height - 14, 12, '#8a5737');
+    ctx.strokeStyle = '#4f2f1d';
+    ctx.lineWidth = 4;
     ctx.beginPath();
-    ctx.moveTo(x + 8 + i * 6, y + shell.height - 2);
-    ctx.lineTo(x + shell.width / 2, y + 7);
+    ctx.arc(x + obstacle.width / 2, y + obstacle.height / 2, 12, 0, Math.PI * 2);
     ctx.stroke();
+  } else {
+    ctx.fillStyle = '#4c8d89';
+    ctx.beginPath();
+    ctx.moveTo(x + obstacle.width / 2, y);
+    ctx.lineTo(x + obstacle.width, y + obstacle.height * 0.6);
+    ctx.lineTo(x + obstacle.width * 0.74, y + obstacle.height);
+    ctx.lineTo(x + obstacle.width * 0.26, y + obstacle.height);
+    ctx.lineTo(x, y + obstacle.height * 0.6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#9ff4eb';
+    ctx.beginPath();
+    ctx.moveTo(x + obstacle.width / 2, y + 10);
+    ctx.lineTo(x + obstacle.width * 0.78, y + obstacle.height * 0.58);
+    ctx.lineTo(x + obstacle.width * 0.5, y + obstacle.height - 8);
+    ctx.lineTo(x + obstacle.width * 0.22, y + obstacle.height * 0.58);
+    ctx.closePath();
+    ctx.fill();
   }
-
-  ctx.fillStyle = '#f4c74b';
-  ctx.beginPath();
-  ctx.arc(x + shell.width - 4, y + 4, 4, 0, Math.PI * 2);
-  ctx.fill();
 }
 
 function drawParticles() {
@@ -456,7 +378,6 @@ function drawParticles() {
 
 function render() {
   drawBackground();
-  collectibles.forEach(drawCollectible);
   drawPlayer();
   obstacles.forEach(drawObstacle);
   drawParticles();
@@ -527,7 +448,7 @@ showTipBtn.addEventListener('click', () => {
 });
 
 window.addEventListener('keydown', event => {
-  if (event.code === 'Space') {
+  if (['Space', 'ArrowUp', 'KeyW'].includes(event.code)) {
     event.preventDefault();
     if (!state.playing) resetGame();
     else jump();
