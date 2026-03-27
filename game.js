@@ -18,15 +18,20 @@ const distanceValue = document.getElementById('distance-value');
 const coinValue = document.getElementById('coin-value');
 const bestValue = document.getElementById('best-value');
 
-const visitorCount = document.getElementById('visitor-count');
-const visitorList = document.getElementById('visitor-list');
+const guestbookCount = document.getElementById('guestbook-count');
+const guestbookList = document.getElementById('guestbook-list');
+const guestbookForm = document.getElementById('guestbook-form');
+const guestbookInput = document.getElementById('guestbook-input');
 const leaderboardList = document.getElementById('leaderboard-list');
+const jumpBtn = document.getElementById('jump-btn');
+const duckBtn = document.getElementById('duck-btn');
 
 const otterSource = document.getElementById('otter-source');
 const otterPreview = document.getElementById('otter-preview');
 
 const STORAGE_KEYS = {
   visitors: 'karby_visitors',
+  guestbook: 'karby_guestbook',
   leaderboard: 'karby_leaderboard',
   lastPlayer: 'karby_last_player',
 };
@@ -38,6 +43,7 @@ const flyers = [];
 const particles = [];
 
 let visitors = loadJson(STORAGE_KEYS.visitors, []);
+let guestbook = loadJson(STORAGE_KEYS.guestbook, []);
 let leaderboard = loadJson(STORAGE_KEYS.leaderboard, []);
 let otterSprite = null;
 let spawnTimer = 0;
@@ -97,7 +103,7 @@ function updateOverlay(mode, message) {
   if (mode === 'ready') {
     overlayBadge.textContent = 'READY';
     overlayTitle.textContent = '카비와 함께 출발할 이름을 적어주세요';
-    overlayText.textContent = message || '이름을 입력하면 방문자 목록에 남고, 게임 종료 후 점수 랭킹에도 반영됩니다.';
+    overlayText.textContent = message || '이름을 입력하면 방문자 채팅에 글을 남길 수 있고, 게임 종료 후 점수 랭킹에도 반영됩니다.';
     overlayStartBtn.textContent = '출발하기';
   } else {
     overlayBadge.textContent = 'GAME OVER';
@@ -150,7 +156,6 @@ function registerVisitor(name) {
   }
   visitors = visitors.slice(0, 12);
   saveJson(STORAGE_KEYS.visitors, visitors);
-  renderVisitors();
 }
 
 function updateLeaderboard(distance, coins) {
@@ -196,24 +201,52 @@ function formatSeen(isoString) {
   });
 }
 
-function renderVisitors() {
-  visitorCount.textContent = `${visitors.length}명`;
-  if (!visitors.length) {
-    visitorList.innerHTML = '<li class="empty-state">아직 등록된 방문자가 없어요. 첫 플레이어가 되어보세요.</li>';
+function renderGuestbook() {
+  guestbookCount.textContent = `${guestbook.length}개`;
+  if (!guestbook.length) {
+    guestbookList.innerHTML = '<li class="empty-state">아직 남겨진 글이 없어요. 첫 메시지를 남겨보세요.</li>';
     return;
   }
 
-  visitorList.innerHTML = visitors
+  guestbookList.innerHTML = guestbook
     .map(entry => (
       `<li class="board-item">
         <div>
           <strong>${entry.name}</strong>
-          <div class="visitor-meta">최근 방문 ${formatSeen(entry.lastSeen)}</div>
+          <div class="visitor-meta">${entry.message}</div>
         </div>
-        <span class="visitor-meta">${entry.visits}회</span>
+        <span class="visitor-meta">${formatSeen(entry.createdAt)}</span>
       </li>`
     ))
     .join('');
+}
+
+function addGuestbookMessage() {
+  const message = guestbookInput.value.trim();
+  const author = normalizeName(state.playerName || playerNameInput.value);
+
+  if (!author) {
+    setHelper('채팅 글을 남기려면 먼저 사용자 이름을 입력해 주세요.', true);
+    playerNameInput.focus();
+    return;
+  }
+
+  if (!message) return;
+
+  if (author !== state.playerName) {
+    setCurrentPlayer(author);
+  }
+
+  registerVisitor(author);
+  guestbook.unshift({
+    name: author,
+    message: message.slice(0, 120),
+    createdAt: new Date().toISOString(),
+  });
+  guestbook = guestbook.slice(0, 16);
+  saveJson(STORAGE_KEYS.guestbook, guestbook);
+  guestbookInput.value = '';
+  renderGuestbook();
 }
 
 function renderLeaderboard() {
@@ -743,6 +776,18 @@ function buildOtterSprite() {
   let maxX = 0;
   let maxY = 0;
 
+  const sampleAt = (x, y) => {
+    const index = (y * rawCanvas.width + x) * 4;
+    return [data[index], data[index + 1], data[index + 2]];
+  };
+
+  const backgroundSamples = [
+    sampleAt(1, 1),
+    sampleAt(rawCanvas.width - 2, 1),
+    sampleAt(1, rawCanvas.height - 2),
+    sampleAt(rawCanvas.width - 2, rawCanvas.height - 2),
+  ];
+
   for (let index = 0; index < data.length; index += 4) {
     const r = data[index];
     const g = data[index + 1];
@@ -750,9 +795,14 @@ function buildOtterSprite() {
     const max = Math.max(r, g, b);
     const min = Math.min(r, g, b);
     const average = (r + g + b) / 3;
-    const isDarkNeutral = max - min < 18 && average < 90;
+    const nearCornerSample = backgroundSamples.some(sample => (
+      Math.abs(r - sample[0]) < 28 &&
+      Math.abs(g - sample[1]) < 28 &&
+      Math.abs(b - sample[2]) < 28
+    ));
+    const isDarkNeutral = max - min < 20 && average < 96;
 
-    if (isDarkNeutral) {
+    if (nearCornerSample || isDarkNeutral) {
       data[index + 3] = 0;
       continue;
     }
@@ -839,7 +889,7 @@ player.y = groundY - player.height;
 if (state.playerName) {
   playerNameInput.value = state.playerName;
 }
-renderVisitors();
+renderGuestbook();
 renderLeaderboard();
 refreshPlayerHud();
 renderHud();
@@ -847,3 +897,22 @@ updateOverlay('ready');
 setHelper('이 브라우저 기준으로 기록이 저장돼요.');
 buildOtterSprite();
 requestAnimationFrame(loop);
+
+guestbookForm.addEventListener('submit', event => {
+  event.preventDefault();
+  addGuestbookMessage();
+});
+
+jumpBtn.addEventListener('click', () => {
+  if (!state.playing) startGameFromInput();
+  else jump();
+});
+
+duckBtn.addEventListener('pointerdown', event => {
+  event.preventDefault();
+  startDuck();
+});
+
+['pointerup', 'pointerleave', 'pointercancel'].forEach(type => {
+  duckBtn.addEventListener(type, stopDuck);
+});

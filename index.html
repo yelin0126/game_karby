@@ -26,7 +26,9 @@
         <button id="show-tip-btn" class="ghost-btn" type="button">조작법 보기</button>
       </div>
       <div class="hero-tip" id="hero-tip">
-        스페이스바 또는 화면 클릭으로 점프합니다. 입력창에 커서가 있으면 스페이스는 게임에 반응하지 않아요.
+        <strong>조작법</strong><br>
+        PC: `Space` 점프, `↓` 숙이기, `Esc` 일시정지<br>
+        모바일: 화면 탭 또는 점프 버튼으로 점프, 숙이기 버튼으로 갈매기 피하기
       </div>
     </section>
 
@@ -63,9 +65,9 @@
             <div class="overlay-card">
               <div class="overlay-badge">READY</div>
               <h3>카비와 함께 출발할 이름을 적어주세요</h3>
-              <p>이름을 입력하면 방문자 목록에 남고, 게임 종료 후 점수 랭킹에도 반영됩니다.</p>
+              <p>이름을 입력하면 방문자 채팅에 글을 남길 수 있고, 게임 종료 후 점수 랭킹에도 반영됩니다.</p>
               <label class="overlay-input-label" for="player-name-input">사용자 이름</label>
-              <input id="player-name-input" class="overlay-input" type="text" maxlength="18" placeholder="예: tilon">
+              <input id="player-name-input" class="overlay-input" type="text" maxlength="18" placeholder="예: yelin">
               <div class="overlay-helper" id="overlay-helper">이 브라우저 기준으로 기록이 저장돼요.</div>
               <button id="overlay-start-btn" class="primary-btn" type="button">출발하기</button>
             </div>
@@ -77,31 +79,40 @@
           <div class="control-chip">↓ : 숙이기</div>
           <div class="control-chip warm">ESC : 일시정지</div>
         </div>
+
+        <div class="mobile-controls">
+          <button id="jump-btn" class="mobile-btn" type="button">점프</button>
+          <button id="duck-btn" class="mobile-btn soft" type="button">숙이기</button>
+        </div>
       </article>
 
       <aside class="side-card">
         <div class="side-head">
           <div class="side-head-copy">
-            <span class="panel-label">VISITOR BOARD</span>
-            <h2>방문자 목록</h2>
-            <p>입장한 이름과 점수 랭킹을 기록하는 보드예요.</p>
+            <span class="panel-label">VISITOR CHAT</span>
+            <h2>방문자 채팅</h2>
+            <p>방문자가 이름으로 한마디를 남길 수 있는 보드예요.</p>
           </div>
           <div class="sprite-frame">
-            <img id="otter-preview" class="sprite-preview" alt="수달 기사 카비">
+            <img id="otter-preview" class="sprite-preview" src="assets/otter-knight.jpg" alt="수달 기사 카비">
           </div>
         </div>
 
         <div class="side-note">
-          GitHub Pages 정적 사이트라서 방문자 목록과 점수 랭킹은 현재 브라우저에만 저장됩니다.
+          GitHub Pages 정적 사이트라서 방문자 채팅과 점수 랭킹은 현재 브라우저에만 저장됩니다.
         </div>
 
         <div class="board-grid">
           <section class="board-panel">
             <div class="board-title-row">
-              <span class="panel-label">VISITORS</span>
-              <strong id="visitor-count">0명</strong>
+              <span class="panel-label">MESSAGES</span>
+              <strong id="guestbook-count">0개</strong>
             </div>
-            <ul id="visitor-list" class="board-list"></ul>
+            <form id="guestbook-form" class="guestbook-form">
+              <input id="guestbook-input" type="text" maxlength="120" placeholder="방문자 한마디 남기기...">
+              <button class="primary-btn" type="submit">남기기</button>
+            </form>
+            <ul id="guestbook-list" class="board-list"></ul>
           </section>
 
           <section class="board-panel">
