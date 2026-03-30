@@ -31,6 +31,8 @@ const STORAGE_KEYS = {
 
 const leaderboard = loadJson(STORAGE_KEYS.leaderboard, []);
 const lastPlayer = localStorage.getItem(STORAGE_KEYS.lastPlayer) || '';
+const BIRD_UNLOCK_DISTANCE = 5000;
+
 let state = {
   playing: false,
   paused: false,
@@ -40,6 +42,7 @@ let state = {
   gravity: 0.68,
   lastTime: 0,
   timeOfDayTime: 0,
+  birdIntroShown: false,
   playerName: lastPlayer,
 };
 
@@ -52,6 +55,7 @@ const player = {
   jumpPower: -15,
   grounded: true,
   bob: 0,
+  sliding: false,
 };
 
 const groundY = canvas.height - 96;
@@ -257,6 +261,7 @@ function prepareRun() {
 function resetGame() {
   state.distance = 0;
   state.speed = 4.2;
+  state.birdIntroShown = false;
   state.playing = true;
   state.paused = false;
   obstacles.length = 0;
@@ -265,6 +270,7 @@ function resetGame() {
   player.y = groundY - player.height;
   player.velocityY = 0;
   player.grounded = true;
+  player.sliding = false;
   overlay.classList.add('hidden');
   pushSystemMessage(`${state.playerName || '플레이어'}님 새 러닝 시작!`);
   renderHud();
@@ -279,9 +285,22 @@ function togglePause() {
 function jump() {
   if (!state.playing || state.paused) return;
   if (!player.grounded) return;
+  player.sliding = false;
   player.velocityY = player.jumpPower;
   player.grounded = false;
   emitDust(player.x + 18, player.y + player.height - 6, 7, '#f1d29d');
+}
+
+function startSlide() {
+  if (!state.playing || state.paused) return;
+  if (!player.grounded) return;
+  if (player.sliding) return;
+  player.sliding = true;
+  emitDust(player.x + 18, groundY - 4, 5, '#d5c28b');
+}
+
+function stopSlide() {
+  player.sliding = false;
 }
 
 function emitDust(x, y, count, color) {
@@ -303,6 +322,20 @@ function maybeSpawnObstacle(delta) {
   if (spawnTimer < threshold) return;
   spawnTimer = 0;
 
+  const canSpawnBird = state.distance >= BIRD_UNLOCK_DISTANCE && Math.random() > 0.7;
+  if (canSpawnBird) {
+    obstacles.push({
+      x: canvas.width + 80,
+      y: groundY - player.height + 8,
+      width: 72,
+      height: 30,
+      type: 'bird',
+      speedMultiplier: 1.18,
+      flap: Math.random() * Math.PI * 2,
+    });
+    return;
+  }
+
   const tall = Math.random() > 0.68;
   obstacles.push({
     x: canvas.width + 60,
@@ -318,6 +351,10 @@ function update(delta) {
 
   state.distance += state.speed * delta * 0.024;
   state.speed += delta * 0.00035;
+  if (state.distance >= BIRD_UNLOCK_DISTANCE && !state.birdIntroShown) {
+    state.birdIntroShown = true;
+    pushSystemMessage('5000m 돌파! 새가 날아오면 오른쪽 방향키로 슬라이딩해서 피하세요.');
+  }
   cloudOffset += state.speed * delta * 0.01;
   hillOffset += state.speed * delta * 0.018;
   sparkOffset += state.speed * delta * 0.03;
@@ -330,12 +367,14 @@ function update(delta) {
     player.velocityY = 0;
     player.grounded = true;
   }
+  if (!player.grounded) player.sliding = false;
   player.bob += delta * 0.012;
 
   maybeSpawnObstacle(delta);
 
   obstacles.forEach(obstacle => {
-    obstacle.x -= state.speed * delta * 0.1;
+    obstacle.x -= state.speed * delta * 0.1 * (obstacle.speedMultiplier || 1);
+    if (obstacle.type === 'bird') obstacle.flap += delta * 0.018;
   });
 
   while (obstacles.length && obstacles[0].x + obstacles[0].width < -30) {
@@ -361,13 +400,15 @@ function update(delta) {
 }
 
 function intersects(a, obstacle) {
-  const padding = 12;
+  const playerTopPadding = a.sliding ? 42 : 10;
+  const playerHeightPadding = a.sliding ? 48 : 14;
   const ax = a.x + 8;
-  const ay = a.y + 10;
+  const ay = a.y + playerTopPadding;
   const aw = a.width - 16;
-  const ah = a.height - 14;
+  const ah = a.height - playerHeightPadding;
+  const padding = obstacle.type === 'bird' ? 8 : 12;
   const bx = obstacle.x + padding;
-  const by = groundY - obstacle.height + padding / 2;
+  const by = (obstacle.y ?? (groundY - obstacle.height)) + padding / 2;
   const bw = obstacle.width - padding * 1.2;
   const bh = obstacle.height - padding;
 
@@ -576,6 +617,11 @@ function drawBackground() {
 }
 
 function drawPlayer() {
+  if (player.sliding) {
+    drawSlidingPlayer();
+    return;
+  }
+
   const bounce = player.grounded ? Math.sin(player.bob) * 2 : -4;
   const x = player.x;
   const y = player.y + bounce;
@@ -662,9 +708,64 @@ function drawPlayer() {
   ctx.stroke();
 }
 
+function drawSlidingPlayer() {
+  const x = player.x;
+  const y = player.y + 22;
+
+  ctx.fillStyle = '#7d4a2a';
+  ctx.beginPath();
+  ctx.ellipse(x + 40, y + 44, 42, 22, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#f0cfaa';
+  ctx.beginPath();
+  ctx.ellipse(x + 56, y + 34, 18, 12, -0.16, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#7f4b2c';
+  ctx.beginPath();
+  ctx.arc(x + 49, y + 22, 8, 0, Math.PI * 2);
+  ctx.arc(x + 69, y + 24, 8, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#2d1b15';
+  ctx.beginPath();
+  ctx.arc(x + 54, y + 34, 3.2, 0, Math.PI * 2);
+  ctx.arc(x + 68, y + 34, 3.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = '#6f3520';
+  ctx.lineWidth = 2.4;
+  ctx.beginPath();
+  ctx.arc(x + 60, y + 39, 8, 0.2 * Math.PI, 0.82 * Math.PI);
+  ctx.stroke();
+
+  drawRoundedRect(x + 14, y + 38, 50, 18, 9, '#2f7b4c');
+  drawRoundedRect(x + 10, y + 34, 58, 10, 5, '#bf4937');
+  ctx.strokeStyle = '#f0c458';
+  ctx.lineWidth = 1.4;
+  ctx.strokeRect(x + 16, y + 40, 46, 13);
+
+  ctx.fillStyle = '#7d4a2a';
+  ctx.fillRect(x + 12, y + 42, 16, 22);
+  ctx.fillRect(x + 28, y + 50, 34, 10);
+  ctx.fillRect(x + 56, y + 46, 20, 10);
+
+  ctx.fillStyle = '#f0d2ad';
+  ctx.fillRect(x + 14, y + 58, 12, 7);
+  ctx.fillRect(x + 64, y + 46, 10, 6);
+
+  ctx.strokeStyle = '#6f3f22';
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(x + 8, y + 46);
+  ctx.quadraticCurveTo(x - 10, y + 34, x - 2, y + 18);
+  ctx.stroke();
+}
+
 function drawObstacle(obstacle) {
   const x = obstacle.x;
-  const y = groundY - obstacle.height;
+  const y = obstacle.y ?? (groundY - obstacle.height);
   if (obstacle.type === 'log') {
     drawRoundedRect(x, y, obstacle.width, obstacle.height, 16, '#6a4228');
     ctx.fillStyle = '#8c5939';
@@ -674,7 +775,7 @@ function drawObstacle(obstacle) {
     ctx.beginPath();
     ctx.arc(x + obstacle.width / 2, y + obstacle.height / 2, 12, 0, Math.PI * 2);
     ctx.stroke();
-  } else {
+  } else if (obstacle.type === 'crystal') {
     ctx.fillStyle = '#4c8d89';
     ctx.beginPath();
     ctx.moveTo(x + obstacle.width / 2, y);
@@ -692,6 +793,42 @@ function drawObstacle(obstacle) {
     ctx.lineTo(x + obstacle.width * 0.22, y + obstacle.height * 0.58);
     ctx.closePath();
     ctx.fill();
+  } else if (obstacle.type === 'bird') {
+    const flap = Math.sin(obstacle.flap || 0);
+    ctx.fillStyle = '#5f4636';
+    ctx.beginPath();
+    ctx.ellipse(x + 34, y + 15, 18, 12, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#785543';
+    ctx.beginPath();
+    ctx.moveTo(x + 20, y + 14);
+    ctx.quadraticCurveTo(x + 6, y + 2 + flap * 5, x + 10, y + 24);
+    ctx.quadraticCurveTo(x + 22, y + 20, x + 28, y + 14);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(x + 40, y + 14);
+    ctx.quadraticCurveTo(x + 60, y + 2 - flap * 5, x + 64, y + 26);
+    ctx.quadraticCurveTo(x + 48, y + 21, x + 36, y + 14);
+    ctx.fill();
+
+    ctx.fillStyle = '#d9bf91';
+    ctx.beginPath();
+    ctx.ellipse(x + 39, y + 17, 8, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#251914';
+    ctx.beginPath();
+    ctx.arc(x + 40, y + 12, 2.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = '#d78a47';
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(x + 50, y + 15);
+    ctx.lineTo(x + 60, y + 13);
+    ctx.stroke();
   }
 }
 
@@ -790,7 +927,15 @@ window.addEventListener('keydown', event => {
     if (!state.playing && overlay.classList.contains('hidden')) prepareRun();
     else jump();
   }
+  if (event.code === 'ArrowRight') {
+    event.preventDefault();
+    startSlide();
+  }
   if (event.code === 'Escape') togglePause();
+});
+
+window.addEventListener('keyup', event => {
+  if (event.code === 'ArrowRight') stopSlide();
 });
 
 canvas.addEventListener('pointerdown', () => {
