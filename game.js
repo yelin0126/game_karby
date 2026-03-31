@@ -37,7 +37,7 @@ const SUPABASE_ENABLED = Boolean(
   && SUPABASE_CONFIG.anonKey
 );
 
-const leaderboard = loadJson(STORAGE_KEYS.leaderboard, []);
+const leaderboard = normalizeLeaderboardEntries(loadJson(STORAGE_KEYS.leaderboard, []));
 const lastPlayer = localStorage.getItem(STORAGE_KEYS.lastPlayer) || '';
 const BIRD_UNLOCK_DISTANCE = 5000;
 const BIRD_SPAWN_CHANCE = 0.12;
@@ -202,6 +202,22 @@ function normalizeName(value) {
   return value.trim().replace(/\s+/g, ' ').slice(0, 18);
 }
 
+function normalizeLeaderboardEntries(entries) {
+  if (!Array.isArray(entries)) return [];
+
+  return entries.map(entry => {
+    const bestScore = Math.floor(Number(entry.bestScore ?? entry.bestDistance) || 0);
+    return {
+      name: normalizeName(entry.name || ''),
+      bestScore,
+      bestDistance: Math.floor(Number(entry.bestDistance ?? bestScore) || 0),
+      bestCoins: Math.floor(Number(entry.bestCoins) || 0),
+      games: Math.max(1, Math.floor(Number(entry.games) || 1)),
+      updatedAt: entry.updatedAt || new Date().toISOString(),
+    };
+  }).filter(entry => entry.name);
+}
+
 function findLeaderboardEntry(name) {
   return leaderboard.find(entry => entry.name.toLowerCase() === name.toLowerCase());
 }
@@ -209,19 +225,19 @@ function findLeaderboardEntry(name) {
 function refreshCurrentPlayer() {
   playerValue.textContent = state.playerName || '-';
   const entry = state.playerName ? findLeaderboardEntry(state.playerName) : null;
-  state.best = entry ? entry.bestDistance : 0;
+  state.best = entry ? entry.bestScore : 0;
   bestValue.textContent = `${String(Math.floor(state.best)).padStart(3, '0')}pt`;
 }
 
 function sortLeaderboardEntries(entries) {
   entries.sort((a, b) => {
-    if (b.bestDistance !== a.bestDistance) return b.bestDistance - a.bestDistance;
+    if (b.bestScore !== a.bestScore) return b.bestScore - a.bestScore;
     return new Date(b.updatedAt) - new Date(a.updatedAt);
   });
 }
 
 function replaceLeaderboard(entries) {
-  leaderboard.splice(0, leaderboard.length, ...entries);
+  leaderboard.splice(0, leaderboard.length, ...normalizeLeaderboardEntries(entries));
   sortLeaderboardEntries(leaderboard);
   saveJson(STORAGE_KEYS.leaderboard, leaderboard);
   renderLeaderboard();
@@ -236,13 +252,17 @@ function aggregateScores(scores) {
     if (!name) return;
     const key = name.toLowerCase();
     const existing = byPlayer.get(key);
+    const finalScore = Math.floor(Number(score.final_score ?? score.distance) || 0);
     const distance = Math.floor(Number(score.distance) || 0);
+    const coins = Math.floor(Number(score.coins) || 0);
     const updatedAt = score.created_at || score.updatedAt || new Date().toISOString();
 
     if (!existing) {
       byPlayer.set(key, {
         name,
+        bestScore: finalScore,
         bestDistance: distance,
+        bestCoins: coins,
         games: 1,
         updatedAt,
       });
@@ -250,7 +270,11 @@ function aggregateScores(scores) {
     }
 
     existing.games += 1;
-    existing.bestDistance = Math.max(existing.bestDistance, distance);
+    if (finalScore > existing.bestScore) {
+      existing.bestScore = finalScore;
+      existing.bestDistance = distance;
+      existing.bestCoins = coins;
+    }
     if (new Date(updatedAt) > new Date(existing.updatedAt)) {
       existing.updatedAt = updatedAt;
     }
@@ -264,8 +288,8 @@ async function syncLeaderboardFromSupabase() {
 
   try {
     const query = new URLSearchParams({
-      select: 'player_name,distance,created_at',
-      order: 'distance.desc,created_at.desc',
+      select: 'player_name,distance,coins,final_score,created_at',
+      order: 'final_score.desc,created_at.desc',
       limit: String(REMOTE_SCORE_FETCH_LIMIT),
     });
 
@@ -291,15 +315,22 @@ async function syncLeaderboardFromSupabase() {
 }
 
 function updateLeaderboardEntry(name, score, updatedAt = new Date().toISOString()) {
+  const normalizedScore = typeof score === 'number' ? { finalScore: score, distance: score, coins: 0 } : score;
   const existing = findLeaderboardEntry(name);
   if (existing) {
     existing.games += 1;
     existing.updatedAt = updatedAt;
-    existing.bestDistance = Math.max(existing.bestDistance, score);
+    if (normalizedScore.finalScore > existing.bestScore) {
+      existing.bestScore = normalizedScore.finalScore;
+      existing.bestDistance = normalizedScore.distance;
+      existing.bestCoins = normalizedScore.coins;
+    }
   } else {
     leaderboard.push({
       name,
-      bestDistance: score,
+      bestScore: normalizedScore.finalScore,
+      bestDistance: normalizedScore.distance,
+      bestCoins: normalizedScore.coins,
       games: 1,
       updatedAt,
     });
@@ -325,7 +356,9 @@ async function saveScoreToSupabase(name, score) {
       },
       body: JSON.stringify({
         player_name: name,
-        distance: score,
+        distance: score.distance,
+        coins: score.coins,
+        final_score: score.finalScore,
       }),
     });
 
@@ -354,7 +387,7 @@ function renderLeaderboard() {
         <span class="rank-badge">${index + 1}</span>
         <div>
           <strong>${entry.name}</strong>
-          <div class="leader-meta">${entry.bestDistance}pt</div>
+          <div class="leader-meta">${entry.bestScore}pt · ${entry.bestDistance}m · ${entry.bestCoins}코인</div>
         </div>
         <span class="leader-meta">${entry.games}회</span>
       </li>`
@@ -654,7 +687,11 @@ function endGame() {
   const finalDistance = getDistanceScore();
   const coinBonus = getCoinBonus();
   const finalScore = getFinalScore();
-  const rank = saveScore(finalScore);
+  const rank = saveScore({
+    distance: finalDistance,
+    coins: state.coins,
+    finalScore,
+  });
   document.querySelector('.overlay-card p').textContent = `거리 ${finalDistance}m, 코인 ${state.coins}개로 보너스 ${coinBonus}점을 얻어 최종 ${finalScore}점입니다.${rank ? ` 현재 ${rank}위예요.` : ''} 다시 도전해보세요.`;
   overlayStartBtn.textContent = '다시 달리기';
   setOverlayHelper('같은 이름으로 다시 도전하거나 다른 이름을 입력할 수 있어요.', false);
