@@ -27,17 +27,21 @@ const responses = {
 
 const STORAGE_KEYS = {
   leaderboard: 'karby_leaderboard',
+  guestbook: 'karby_guestbook',
   lastPlayer: 'karby_last_player',
 };
 
 const SUPABASE_CONFIG = window.__SUPABASE_CONFIG__ || {};
-const SUPABASE_TABLE = SUPABASE_CONFIG.leaderboardTable || 'leaderboard_scores';
+const SUPABASE_LEADERBOARD_TABLE = SUPABASE_CONFIG.leaderboardTable || 'leaderboard_scores';
+const SUPABASE_GUESTBOOK_TABLE = SUPABASE_CONFIG.guestbookTable || 'guestbook_messages';
 const SUPABASE_ENABLED = Boolean(
   SUPABASE_CONFIG.url
   && SUPABASE_CONFIG.anonKey
 );
 
 const leaderboard = normalizeLeaderboardEntries(loadJson(STORAGE_KEYS.leaderboard, []));
+const guestbookEntries = normalizeGuestbookEntries(loadJson(STORAGE_KEYS.guestbook, []));
+const transientChatEntries = [];
 const lastPlayer = localStorage.getItem(STORAGE_KEYS.lastPlayer) || '';
 const BIRD_UNLOCK_DISTANCE = 5000;
 const BIRD_SPAWN_CHANCE = 0.12;
@@ -47,6 +51,8 @@ const COIN_SCORE_VALUE = 10;
 const COIN_SPAWN_MIN_MS = 1800;
 const COIN_SPAWN_MAX_MS = 3200;
 const REMOTE_SCORE_FETCH_LIMIT = 1000;
+const REMOTE_GUESTBOOK_FETCH_LIMIT = 60;
+const REMOTE_SYNC_INTERVAL_MS = 15000;
 
 let state = {
   playing: false,
@@ -202,6 +208,10 @@ function normalizeName(value) {
   return value.trim().replace(/\s+/g, ' ').slice(0, 18);
 }
 
+function normalizeMessage(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ').slice(0, 120);
+}
+
 function normalizeLeaderboardEntries(entries) {
   if (!Array.isArray(entries)) return [];
 
@@ -216,6 +226,16 @@ function normalizeLeaderboardEntries(entries) {
       updatedAt: entry.updatedAt || new Date().toISOString(),
     };
   }).filter(entry => entry.name);
+}
+
+function normalizeGuestbookEntries(entries) {
+  if (!Array.isArray(entries)) return [];
+
+  return entries.map(entry => ({
+    name: normalizeName(entry.name || entry.player_name || ''),
+    message: normalizeMessage(entry.message || entry.text || ''),
+    createdAt: entry.createdAt || entry.created_at || new Date().toISOString(),
+  })).filter(entry => entry.name && entry.message);
 }
 
 function findLeaderboardEntry(name) {
@@ -236,12 +256,34 @@ function sortLeaderboardEntries(entries) {
   });
 }
 
+function sortGuestbookEntries(entries) {
+  entries.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+}
+
 function replaceLeaderboard(entries) {
   leaderboard.splice(0, leaderboard.length, ...normalizeLeaderboardEntries(entries));
   sortLeaderboardEntries(leaderboard);
   saveJson(STORAGE_KEYS.leaderboard, leaderboard);
   renderLeaderboard();
   refreshCurrentPlayer();
+}
+
+function replaceGuestbook(entries) {
+  guestbookEntries.splice(0, guestbookEntries.length, ...normalizeGuestbookEntries(entries));
+  sortGuestbookEntries(guestbookEntries);
+  saveJson(STORAGE_KEYS.guestbook, guestbookEntries);
+  renderChatWindow();
+}
+
+function addGuestbookEntry(entry) {
+  guestbookEntries.push({
+    name: normalizeName(entry.name),
+    message: normalizeMessage(entry.message),
+    createdAt: entry.createdAt || new Date().toISOString(),
+  });
+  sortGuestbookEntries(guestbookEntries);
+  saveJson(STORAGE_KEYS.guestbook, guestbookEntries);
+  renderChatWindow();
 }
 
 function aggregateScores(scores) {
@@ -293,7 +335,7 @@ async function syncLeaderboardFromSupabase() {
       limit: String(REMOTE_SCORE_FETCH_LIMIT),
     });
 
-    const response = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/${SUPABASE_TABLE}?${query.toString()}`, {
+    const response = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/${SUPABASE_LEADERBOARD_TABLE}?${query.toString()}`, {
       headers: {
         apikey: SUPABASE_CONFIG.anonKey,
         Authorization: `Bearer ${SUPABASE_CONFIG.anonKey}`,
@@ -310,6 +352,37 @@ async function syncLeaderboardFromSupabase() {
     return true;
   } catch (error) {
     console.error('Failed to load leaderboard from Supabase:', error);
+    return false;
+  }
+}
+
+async function syncGuestbookFromSupabase() {
+  if (!SUPABASE_ENABLED) return false;
+
+  try {
+    const query = new URLSearchParams({
+      select: 'player_name,message,created_at',
+      order: 'created_at.desc',
+      limit: String(REMOTE_GUESTBOOK_FETCH_LIMIT),
+    });
+
+    const response = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/${SUPABASE_GUESTBOOK_TABLE}?${query.toString()}`, {
+      headers: {
+        apikey: SUPABASE_CONFIG.anonKey,
+        Authorization: `Bearer ${SUPABASE_CONFIG.anonKey}`,
+      },
+    });
+
+    if (!response.ok) {
+      console.error('Failed to load guestbook from Supabase:', response.status, response.statusText);
+      return false;
+    }
+
+    const data = await response.json();
+    replaceGuestbook((data || []).reverse());
+    return true;
+  } catch (error) {
+    console.error('Failed to load guestbook from Supabase:', error);
     return false;
   }
 }
@@ -346,7 +419,7 @@ async function saveScoreToSupabase(name, score) {
   if (!SUPABASE_ENABLED) return false;
 
   try {
-    const response = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/${SUPABASE_TABLE}`, {
+    const response = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/${SUPABASE_LEADERBOARD_TABLE}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -373,6 +446,58 @@ async function saveScoreToSupabase(name, score) {
     console.error('Failed to save score to Supabase:', error);
     return false;
   }
+}
+
+async function saveGuestbookToSupabase(name, message) {
+  if (!SUPABASE_ENABLED) return false;
+
+  try {
+    const response = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/${SUPABASE_GUESTBOOK_TABLE}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SUPABASE_CONFIG.anonKey,
+        Authorization: `Bearer ${SUPABASE_CONFIG.anonKey}`,
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify({
+        player_name: name,
+        message,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('Failed to save guestbook message to Supabase:', response.status, response.statusText);
+      return false;
+    }
+
+    await syncGuestbookFromSupabase();
+    return true;
+  } catch (error) {
+    console.error('Failed to save guestbook message to Supabase:', error);
+    return false;
+  }
+}
+
+async function syncRemoteData() {
+  if (!SUPABASE_ENABLED) {
+    return {
+      leaderboardSynced: false,
+      guestbookSynced: false,
+      anySynced: false,
+    };
+  }
+
+  const [leaderboardSynced, guestbookSynced] = await Promise.all([
+    syncLeaderboardFromSupabase(),
+    syncGuestbookFromSupabase(),
+  ]);
+
+  return {
+    leaderboardSynced,
+    guestbookSynced,
+    anySynced: leaderboardSynced || guestbookSynced,
+  };
 }
 
 function renderLeaderboard() {
@@ -402,6 +527,10 @@ function saveScore(score) {
   updateLeaderboardEntry(state.playerName, score, now);
   void saveScoreToSupabase(state.playerName, score);
   return leaderboard.findIndex(entry => entry.name.toLowerCase() === state.playerName.toLowerCase()) + 1;
+}
+
+function getGuestbookAuthor() {
+  return normalizeName(state.playerName || playerNameInput.value || lastPlayer || '방문자');
 }
 
 function prepareRun() {
@@ -1232,24 +1361,68 @@ function loop(timestamp) {
   requestAnimationFrame(loop);
 }
 
-function addChatLine(type, name, text) {
+function buildChatLine(type, name, text) {
   const wrapper = document.createElement('div');
   wrapper.className = `chat-line ${type}`;
-  wrapper.innerHTML = `<span class="chat-name">${name}</span><p>${text}</p>`;
-  chatWindow.appendChild(wrapper);
+  const nameEl = document.createElement('span');
+  nameEl.className = 'chat-name';
+  nameEl.textContent = name;
+  const textEl = document.createElement('p');
+  textEl.textContent = text;
+  wrapper.append(nameEl, textEl);
+  return wrapper;
+}
+
+function renderChatWindow() {
+  const combinedEntries = [
+    ...guestbookEntries.map(entry => ({
+      type: entry.name.toLowerCase() === (state.playerName || '').toLowerCase() ? 'me' : 'friend',
+      name: entry.name,
+      text: entry.message,
+      createdAt: entry.createdAt,
+    })),
+    ...transientChatEntries,
+  ].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+  chatWindow.innerHTML = '';
+
+  if (!combinedEntries.length) {
+    chatWindow.appendChild(buildChatLine('system', 'system', '아직 남겨진 글이 없어요.'));
+    return;
+  }
+
+  combinedEntries.slice(-40).forEach(entry => {
+    chatWindow.appendChild(buildChatLine(entry.type, entry.name, entry.text));
+  });
+
   chatWindow.scrollTop = chatWindow.scrollHeight;
 }
 
+function addTransientChatLine(type, name, text) {
+  transientChatEntries.push({
+    type,
+    name,
+    text,
+    createdAt: new Date().toISOString(),
+  });
+  renderChatWindow();
+}
+
 function pushFriendMessage(text) {
-  addChatLine('friend', '루나', text);
+  addTransientChatLine('friend', '루나', text);
 }
 
 function pushMyMessage(text) {
-  addChatLine('me', state.playerName || '방문자', text);
+  const author = getGuestbookAuthor();
+  addGuestbookEntry({
+    name: author,
+    message: text,
+  });
+  void saveGuestbookToSupabase(author, normalizeMessage(text));
 }
 
 function pushSystemMessage(text) {
-  addChatLine('system', 'system', text);
+  addTransientChatLine('system', 'system', text);
 }
 
 function answerMessage(message) {
@@ -1263,7 +1436,7 @@ function answerMessage(message) {
 
 chatForm.addEventListener('submit', event => {
   event.preventDefault();
-  const message = chatInput.value.trim();
+  const message = normalizeMessage(chatInput.value);
   if (!message) return;
   pushMyMessage(message);
   chatInput.value = '';
@@ -1272,7 +1445,8 @@ chatForm.addEventListener('submit', event => {
 
 replyButtons.forEach(button => {
   button.addEventListener('click', () => {
-    const message = button.dataset.reply;
+    const message = normalizeMessage(button.dataset.reply);
+    if (!message) return;
     pushMyMessage(message);
     window.setTimeout(() => pushFriendMessage(answerMessage(message)), 420);
   });
@@ -1317,8 +1491,26 @@ canvas.addEventListener('pointerdown', () => {
 
 playerNameInput.value = lastPlayer;
 renderLeaderboard();
+renderChatWindow();
 renderHud();
 player.y = groundY - player.height;
-chatWindow.innerHTML = '<div class="chat-line system"><span class="chat-name">system</span><p>아직 남겨진 글이 없어요.</p></div>';
-void syncLeaderboardFromSupabase();
+if (SUPABASE_ENABLED) {
+  pushSystemMessage('공용 기록 서버와 연결을 시도하는 중이에요.');
+  void syncRemoteData().then(syncStatus => {
+    pushSystemMessage(
+      syncStatus.leaderboardSynced && syncStatus.guestbookSynced
+        ? '공용 DB에서 점수와 방명록을 불러왔어요. 다른 로컬에서도 같은 기록이 보여요.'
+        : syncStatus.leaderboardSynced
+          ? '공용 DB에서 점수는 불러왔지만 방명록 테이블 연결은 아직 안 된 상태예요.'
+          : syncStatus.anySynced
+            ? '공용 DB 일부만 연결됐어요. 나머지 기록은 아직 로컬에만 남을 수 있어요.'
+            : '공용 DB 연결에 실패해서 지금은 이 브라우저의 로컬 기록만 보여주고 있어요.',
+    );
+  });
+  window.setInterval(() => {
+    void syncRemoteData();
+  }, REMOTE_SYNC_INTERVAL_MS);
+} else {
+  pushSystemMessage('Supabase 설정이 없어 현재는 이 브라우저 로컬 기록만 저장돼요.');
+}
 requestAnimationFrame(loop);
